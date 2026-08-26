@@ -3,6 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { openWebsite } from "./actions.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -11,6 +14,14 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const MEMORY_FILE = path.join(
+  __dirname,
+  "memory.json"
+);
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -25,7 +36,88 @@ const ai = new GoogleGenAI({
   apiKey
 });
 
-const JOJO_INSTRUCTION = `
+/*
+  MEMORY HELPERS
+*/
+
+function loadMemory() {
+  try {
+    if (!fs.existsSync(MEMORY_FILE)) {
+      return {};
+    }
+
+    const raw =
+      fs.readFileSync(
+        MEMORY_FILE,
+        "utf8"
+      );
+
+    if (!raw.trim()) {
+      return {};
+    }
+
+    const memory =
+      JSON.parse(raw);
+
+    if (
+      memory &&
+      typeof memory === "object"
+    ) {
+      return memory;
+    }
+
+    return {};
+
+  } catch (error) {
+    console.error(
+      "Memory read failed:",
+      error
+    );
+
+    return {};
+  }
+}
+
+function saveMemory(memory) {
+  fs.writeFileSync(
+    MEMORY_FILE,
+    JSON.stringify(
+      memory,
+      null,
+      2
+    ),
+    "utf8"
+  );
+}
+
+/*
+  BUILD JOJO INSTRUCTION
+  WITH SAVED MEMORY
+*/
+
+function buildJojoInstruction() {
+  const memory =
+    loadMemory();
+
+  const memoryEntries =
+    Object.entries(memory);
+
+  let memoryText =
+    "No saved memories yet.";
+
+  if (
+    memoryEntries.length > 0
+  ) {
+    memoryText =
+      memoryEntries
+        .map(
+          ([key, value]) =>
+            `- ${key}: ${value}`
+        )
+        .join("\n");
+  }
+
+  return `
 You are JOJO, Arooj's personal AI assistant.
 
 IDENTITY:
@@ -43,122 +135,278 @@ Never say that Google created JOJO.
 Never say that you have no name.
 Never identify yourself as Gemini when asked for your assistant name.
 
+MEMORY:
+
+The following information has been saved by the user.
+Treat it as persistent user memory.
+
+${memoryText}
+
+IMPORTANT MEMORY RULES:
+
+- Use saved memories when they are relevant.
+- If the user asks about a saved memory, answer using the saved value.
+- Do not claim you forgot a saved memory unless it is actually absent.
+- Do not invent memories that are not listed above.
+
 TOOL RULE:
+
 When the user asks you to open a website,
 use the openWebsite function.
 
+After the website tool succeeds,
+briefly tell the user that the website was opened.
+
 Be concise and natural.
 `;
+}
 
-app.get("/token", async (req, res) => {
-  try {
-    const token = await ai.authTokens.create({
-      config: {
-        uses: 1,
+/*
+  LIVE API TOKEN
+*/
 
-        liveConnectConstraints: {
-          model:
-            "gemini-3.1-flash-live-preview",
+app.get(
+  "/token",
+  async (req, res) => {
+    try {
+      const jojoInstruction =
+        buildJojoInstruction();
 
+      console.log(
+        "JOJO memory loaded:",
+        loadMemory()
+      );
+
+      const token =
+        await ai.authTokens.create({
           config: {
-            responseModalities: [
-              "AUDIO"
-            ],
+            uses: 1,
 
-            systemInstruction:
-              JOJO_INSTRUCTION,
+            liveConnectConstraints: {
+              model:
+                "gemini-3.1-flash-live-preview",
 
-            tools: [
-              {
-                functionDeclarations: [
+              config: {
+                responseModalities: [
+                  "AUDIO"
+                ],
+
+                systemInstruction:
+                  jojoInstruction,
+
+                tools: [
                   {
-                    name:
-                      "openWebsite",
+                    functionDeclarations: [
+                      {
+                        name:
+                          "openWebsite",
 
-                    description:
-                      "Open a website in the user's browser.",
+                        description:
+                          "Open a website in the user's browser.",
 
-                    parameters: {
-                      type: "OBJECT",
+                        parameters: {
+                          type:
+                            "OBJECT",
 
-                      properties: {
-                        url: {
-                          type: "STRING",
+                          properties: {
+                            url: {
+                              type:
+                                "STRING",
 
-                          description:
-                            "The complete website URL to open."
+                              description:
+                                "The complete website URL to open."
+                            }
+                          },
+
+                          required: [
+                            "url"
+                          ]
                         }
-                      },
-
-                      required: [
-                        "url"
-                      ]
-                    }
+                      }
+                    ]
                   }
                 ]
               }
-            ]
+            }
           }
-        }
+        });
+
+      console.log(
+        "JOJO V4 ephemeral token created."
+      );
+
+      res.json({
+        token:
+          token.name
+      });
+
+    } catch (error) {
+      console.error(
+        "Token creation failed:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Failed to create Live API token"
+      });
+    }
+  }
+);
+
+/*
+  WEBSITE ACTION
+*/
+
+app.post(
+  "/action",
+  async (req, res) => {
+    try {
+      const {
+        action,
+        value
+      } = req.body;
+
+      if (
+        action ===
+        "openWebsite"
+      ) {
+        const result =
+          await openWebsite(
+            value
+          );
+
+        return res.json(
+          result
+        );
       }
-    });
 
+      return res.status(400).json({
+        success: false,
+        message:
+          "Unknown action."
+      });
+
+    } catch (error) {
+      console.error(
+        "Action failed:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message
+      });
+    }
+  }
+);
+
+/*
+  SAVE MEMORY
+*/
+
+app.post(
+  "/memory",
+  (req, res) => {
+    try {
+      const {
+        key,
+        value
+      } = req.body;
+
+      if (
+        !key ||
+        value === undefined ||
+        value === null
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Memory key and value are required."
+        });
+      }
+
+      const memory =
+        loadMemory();
+
+      memory[key] =
+        String(value);
+
+      saveMemory(
+        memory
+      );
+
+      console.log(
+        "JOJO memory saved:",
+        key,
+        "=",
+        value
+      );
+
+      return res.json({
+        success: true,
+        key: key,
+        value:
+          String(value)
+      });
+
+    } catch (error) {
+      console.error(
+        "Memory save failed:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to save memory."
+      });
+    }
+  }
+);
+
+/*
+  READ ALL MEMORY
+*/
+
+app.get(
+  "/memory",
+  (req, res) => {
+    try {
+      const memory =
+        loadMemory();
+
+      return res.json({
+        success: true,
+        memory:
+          memory
+      });
+
+    } catch (error) {
+      console.error(
+        "Memory retrieval failed:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to retrieve memory."
+      });
+    }
+  }
+);
+
+/*
+  START SERVER
+*/
+
+app.listen(
+  PORT,
+  () => {
     console.log(
-      "JOJO V4 ephemeral token created."
+      `JOJO V4 server running on http://localhost:${PORT}`
     );
-
-    res.json({
-      token: token.name
-    });
-
-  } catch (error) {
-    console.error(
-      "Token creation failed:",
-      error
-    );
-
-    res.status(500).json({
-      error:
-        "Failed to create Live API token"
-    });
   }
-});
-
-app.post("/action", async (req, res) => {
-  try {
-    const {
-      action,
-      value
-    } = req.body;
-if (action === "openWebsite") {
-  const result =
-    await openWebsite(value);
-
-  return res.json(result);
-}
-
-    return res.status(400).json({
-      success: false,
-      message:
-        "Unknown action."
-    });
-
-  } catch (error) {
-    console.error(
-      "Action failed:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      message:
-        error.message
-    });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(
-    `JOJO V4 server running on http://localhost:${PORT}`
-  );
-});
+);
