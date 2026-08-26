@@ -15,26 +15,33 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename =
+  fileURLToPath(import.meta.url);
 
-const MEMORY_FILE = path.join(
-  __dirname,
-  "memory.json"
-);
+const __dirname =
+  path.dirname(__filename);
 
-const apiKey = process.env.GEMINI_API_KEY;
+const MEMORY_FILE =
+  path.join(
+    __dirname,
+    "memory.json"
+  );
+
+const apiKey =
+  process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
   console.error(
     "GEMINI_API_KEY is missing from .env"
   );
+
   process.exit(1);
 }
 
-const ai = new GoogleGenAI({
-  apiKey
-});
+const ai =
+  new GoogleGenAI({
+    apiKey
+  });
 
 /*
   MEMORY HELPERS
@@ -42,7 +49,11 @@ const ai = new GoogleGenAI({
 
 function loadMemory() {
   try {
-    if (!fs.existsSync(MEMORY_FILE)) {
+    if (
+      !fs.existsSync(
+        MEMORY_FILE
+      )
+    ) {
       return {};
     }
 
@@ -52,7 +63,9 @@ function loadMemory() {
         "utf8"
       );
 
-    if (!raw.trim()) {
+    if (
+      !raw.trim()
+    ) {
       return {};
     }
 
@@ -61,7 +74,9 @@ function loadMemory() {
 
     if (
       memory &&
-      typeof memory === "object"
+      typeof memory ===
+        "object" &&
+      !Array.isArray(memory)
     ) {
       return memory;
     }
@@ -78,7 +93,9 @@ function loadMemory() {
   }
 }
 
-function saveMemory(memory) {
+function saveMemory(
+  memory
+) {
   fs.writeFileSync(
     MEMORY_FILE,
     JSON.stringify(
@@ -91,6 +108,22 @@ function saveMemory(memory) {
 }
 
 /*
+  CLEAN MEMORY VALUE
+*/
+
+function cleanMemoryValue(
+  value
+) {
+  return String(value)
+    .trim()
+    .replace(
+      /[.!?]+$/,
+      ""
+    )
+    .trim();
+}
+
+/*
   BUILD JOJO INSTRUCTION
   WITH SAVED MEMORY
 */
@@ -100,13 +133,16 @@ function buildJojoInstruction() {
     loadMemory();
 
   const memoryEntries =
-    Object.entries(memory);
+    Object.entries(
+      memory
+    );
 
   let memoryText =
     "No saved memories yet.";
 
   if (
-    memoryEntries.length > 0
+    memoryEntries.length >
+    0
   ) {
     memoryText =
       memoryEntries
@@ -121,6 +157,7 @@ function buildJojoInstruction() {
 You are JOJO, Arooj's personal AI assistant.
 
 IDENTITY:
+
 - Your name is JOJO.
 - Your creator is Arooj.
 - You are powered by Google's Gemini technology.
@@ -131,14 +168,19 @@ If asked your name, say:
 If asked who created you, say:
 "My creator is Arooj."
 
+If asked who your creator is, say:
+"My creator is Arooj."
+
+If asked whether you are Gemini or JOJO, say:
+"I am JOJO, Arooj's personal AI assistant. I am powered by Google's Gemini technology."
+
 Never say that Google created JOJO.
 Never say that you have no name.
 Never identify yourself as Gemini when asked for your assistant name.
 
 MEMORY:
 
-The following information has been saved by the user.
-Treat it as persistent user memory.
+The following information has been explicitly saved by the user:
 
 ${memoryText}
 
@@ -146,10 +188,14 @@ IMPORTANT MEMORY RULES:
 
 - Use saved memories when they are relevant.
 - If the user asks about a saved memory, answer using the saved value.
-- Do not claim you forgot a saved memory unless it is actually absent.
-- Do not invent memories that are not listed above.
+- If the user asks "What do you remember about me?", summarize the saved memories.
+- If the user asks "What do you remember?", summarize the saved memories.
+- If the user asks about a memory that is not listed, say that you do not have that information saved.
+- Never invent a memory.
+- Never claim a memory was forgotten unless it has actually been deleted.
+- Treat the saved memory list above as persistent memory.
 
-TOOL RULE:
+ACTION RULE:
 
 When the user asks you to open a website,
 use the openWebsite function.
@@ -158,7 +204,9 @@ After the website tool succeeds,
 briefly tell the user that the website was opened.
 
 Be concise and natural.
+Speak clearly.
 `;
+
 }
 
 /*
@@ -167,7 +215,10 @@ Be concise and natural.
 
 app.get(
   "/token",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const jojoInstruction =
         buildJojoInstruction();
@@ -235,7 +286,7 @@ app.get(
         "JOJO V4 ephemeral token created."
       );
 
-      res.json({
+      return res.json({
         token:
           token.name
       });
@@ -246,7 +297,9 @@ app.get(
         error
       );
 
-      res.status(500).json({
+      return res.status(
+        500
+      ).json({
         error:
           "Failed to create Live API token"
       });
@@ -260,7 +313,10 @@ app.get(
 
 app.post(
   "/action",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const {
         action,
@@ -281,7 +337,9 @@ app.post(
         );
       }
 
-      return res.status(400).json({
+      return res.status(
+        400
+      ).json({
         success: false,
         message:
           "Unknown action."
@@ -293,7 +351,9 @@ app.post(
         error
       );
 
-      return res.status(500).json({
+      return res.status(
+        500
+      ).json({
         success: false,
         message:
           error.message
@@ -308,7 +368,10 @@ app.post(
 
 app.post(
   "/memory",
-  (req, res) => {
+  (
+    req,
+    res
+  ) => {
     try {
       const {
         key,
@@ -320,18 +383,47 @@ app.post(
         value === undefined ||
         value === null
       ) {
-        return res.status(400).json({
+        return res.status(
+          400
+        ).json({
           success: false,
           message:
             "Memory key and value are required."
         });
       }
 
+      const cleanKey =
+        String(key)
+          .trim()
+          .toLowerCase()
+          .replace(
+            /\s+/g,
+            "_"
+          );
+
+      const cleanValue =
+        cleanMemoryValue(
+          value
+        );
+
+      if (
+        !cleanKey ||
+        !cleanValue
+      ) {
+        return res.status(
+          400
+        ).json({
+          success: false,
+          message:
+            "Memory key and value cannot be empty."
+        });
+      }
+
       const memory =
         loadMemory();
 
-      memory[key] =
-        String(value);
+      memory[cleanKey] =
+        cleanValue;
 
       saveMemory(
         memory
@@ -339,16 +431,17 @@ app.post(
 
       console.log(
         "JOJO memory saved:",
-        key,
+        cleanKey,
         "=",
-        value
+        cleanValue
       );
 
       return res.json({
         success: true,
-        key: key,
+        key:
+          cleanKey,
         value:
-          String(value)
+          cleanValue
       });
 
     } catch (error) {
@@ -357,7 +450,9 @@ app.post(
         error
       );
 
-      return res.status(500).json({
+      return res.status(
+        500
+      ).json({
         success: false,
         message:
           "Failed to save memory."
@@ -372,7 +467,10 @@ app.post(
 
 app.get(
   "/memory",
-  (req, res) => {
+  (
+    req,
+    res
+  ) => {
     try {
       const memory =
         loadMemory();
@@ -389,10 +487,173 @@ app.get(
         error
       );
 
-      return res.status(500).json({
+      return res.status(
+        500
+      ).json({
         success: false,
         message:
           "Failed to retrieve memory."
+      });
+    }
+  }
+);
+
+/*
+  DELETE ONE MEMORY
+*/
+
+app.delete(
+  "/memory/:key",
+  (
+    req,
+    res
+  ) => {
+    try {
+      const key =
+        String(
+          req.params.key
+        )
+          .trim()
+          .toLowerCase()
+          .replace(
+            /\s+/g,
+            "_"
+          );
+
+      if (!key) {
+        return res.status(
+          400
+        ).json({
+          success: false,
+          message:
+            "Memory key is required."
+        });
+      }
+
+      const memory =
+        loadMemory();
+
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          memory,
+          key
+        )
+      ) {
+        return res.status(
+          404
+        ).json({
+          success: false,
+          message:
+            "Memory not found."
+        });
+      }
+
+      const oldValue =
+        memory[key];
+
+      delete memory[key];
+
+      saveMemory(
+        memory
+      );
+
+      console.log(
+        "JOJO memory deleted:",
+        key,
+        "=",
+        oldValue
+      );
+
+      return res.json({
+        success: true,
+        key:
+          key,
+        value:
+          oldValue
+      });
+
+    } catch (error) {
+      console.error(
+        "Memory delete failed:",
+        error
+      );
+
+      return res.status(
+        500
+      ).json({
+        success: false,
+        message:
+          "Failed to delete memory."
+      });
+    }
+  }
+);
+/*
+  DELETE MEMORY
+*/
+
+app.delete(
+  "/memory/:key",
+  (req, res) => {
+    try {
+      const key =
+        req.params.key;
+
+      if (!key) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Memory key is required."
+        });
+      }
+
+      const memory =
+        loadMemory();
+
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          memory,
+          key
+        )
+      ) {
+        console.log(
+          "JOJO memory not found:",
+          key
+        );
+
+        return res.json({
+          success: false,
+          message:
+            "Memory not found."
+        });
+      }
+
+      delete memory[key];
+
+      saveMemory(
+        memory
+      );
+
+      console.log(
+        "JOJO memory deleted:",
+        key
+      );
+
+      return res.json({
+        success: true,
+        key: key
+      });
+
+    } catch (error) {
+      console.error(
+        "Memory delete failed:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to delete memory."
       });
     }
   }

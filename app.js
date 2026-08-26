@@ -48,6 +48,27 @@ Never say that Google created JOJO.
 If the user asks about the underlying AI technology,
 you may truthfully explain that you are powered by Google's Gemini technology.
 
+MEMORY RULES:
+
+The user may tell you information to remember.
+
+Examples:
+"Remember my favorite language is Python."
+"Remember that my favorite color is blue."
+"Remember I like Arduino."
+
+When information has been saved by the memory system,
+use it naturally when the user asks about it.
+
+If the user asks:
+"What do you remember about me?"
+"Tell me what you remember."
+"What do you know about me?"
+
+Answer using the saved information available to you.
+
+Do not invent memories.
+
 ACTION RULES:
 
 You have access to tools for actions on the user's computer.
@@ -318,8 +339,16 @@ async function startMicrophone() {
     "JOJO microphone started."
   );
 }
-async function executeWebsiteAction(functionCall) {
-  const url = functionCall.args?.url;
+
+/*
+  WEBSITE ACTION
+*/
+
+async function executeWebsiteAction(
+  functionCall
+) {
+  const url =
+    functionCall.args?.url;
 
   if (!url) {
     console.error(
@@ -329,8 +358,12 @@ async function executeWebsiteAction(functionCall) {
     session?.sendToolResponse({
       functionResponses: [
         {
-          id: functionCall.id,
-          name: functionCall.name,
+          id:
+            functionCall.id,
+
+          name:
+            functionCall.name,
+
           response: {
             output:
               "The website could not be opened because no URL was provided."
@@ -343,21 +376,27 @@ async function executeWebsiteAction(functionCall) {
   }
 
   try {
-    const response = await fetch(
-      "http://localhost:3000/action",
-      {
-        method: "POST",
+    const response =
+      await fetch(
+        "http://localhost:3000/action",
+        {
+          method: "POST",
 
-        headers: {
-          "Content-Type": "application/json"
-        },
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
 
-        body: JSON.stringify({
-          action: "openWebsite",
-          value: url
-        })
-      }
-    );
+          body:
+            JSON.stringify({
+              action:
+                "openWebsite",
+
+              value:
+                url
+            })
+        }
+      );
 
     const responseText =
       await response.text();
@@ -379,9 +418,10 @@ async function executeWebsiteAction(functionCall) {
       responseText.trim().length > 0
     ) {
       try {
-        result = JSON.parse(
-          responseText
-        );
+        result =
+          JSON.parse(
+            responseText
+          );
       } catch (parseError) {
         console.error(
           "ACTION RESPONSE IS NOT JSON:",
@@ -392,8 +432,10 @@ async function executeWebsiteAction(functionCall) {
 
     const isSuccess =
       response.ok &&
-      (result === null ||
-        result.success !== false);
+      (
+        result === null ||
+        result.success !== false
+      );
 
     console.log(
       "Function action resolved success:",
@@ -410,8 +452,12 @@ async function executeWebsiteAction(functionCall) {
       session?.sendToolResponse({
         functionResponses: [
           {
-            id: functionCall.id,
-            name: functionCall.name,
+            id:
+              functionCall.id,
+
+            name:
+              functionCall.name,
+
             response: {
               output:
                 "The website could not be opened."
@@ -426,8 +472,12 @@ async function executeWebsiteAction(functionCall) {
     session?.sendToolResponse({
       functionResponses: [
         {
-          id: functionCall.id,
-          name: functionCall.name,
+          id:
+            functionCall.id,
+
+          name:
+            functionCall.name,
+
           response: {
             output:
               "The website was opened successfully."
@@ -445,8 +495,12 @@ async function executeWebsiteAction(functionCall) {
     session?.sendToolResponse({
       functionResponses: [
         {
-          id: functionCall.id,
-          name: functionCall.name,
+          id:
+            functionCall.id,
+
+          name:
+            functionCall.name,
+
           response: {
             output:
               "The website could not be opened."
@@ -456,6 +510,236 @@ async function executeWebsiteAction(functionCall) {
     });
   }
 }
+
+/*
+  SAVE MEMORY
+*/
+
+async function saveUserMemory(
+  userText
+) {
+  const rememberMatch =
+    userText.match(
+      /remember(?: that)? (?:my )?(.+?) is (.+)/i
+    );
+
+  if (!rememberMatch) {
+    return false;
+  }
+
+  const key =
+    rememberMatch[1]
+      .trim()
+      .toLowerCase()
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  const value =
+    rememberMatch[2]
+      .trim();
+
+  try {
+    const response =
+      await fetch(
+        "http://localhost:3000/memory",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              key:
+                key,
+
+              value:
+                value
+            })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    console.log(
+      "MEMORY HTTP STATUS:",
+      response.status
+    );
+
+    console.log(
+      "MEMORY RAW RESPONSE:",
+      responseText
+    );
+
+    let result = null;
+
+    if (
+      responseText &&
+      responseText.trim().length > 0
+    ) {
+      try {
+        result =
+          JSON.parse(
+            responseText
+          );
+      } catch (parseError) {
+        console.error(
+          "MEMORY RESPONSE IS NOT JSON:",
+          parseError
+        );
+      }
+    }
+
+    if (
+      response.ok &&
+      result?.success !== false
+    ) {
+      console.log(
+        "JOJO memory saved successfully:",
+        key,
+        "=",
+        value
+      );
+
+      return true;
+    }
+
+    console.error(
+      "JOJO memory save failed:",
+      result || responseText
+    );
+
+  } catch (error) {
+    console.error(
+      "Memory save failed:",
+      error
+    );
+  }
+
+  return false;
+}
+
+/*
+  FORGET MEMORY
+*/
+
+async function forgetUserMemory(
+  userText
+) {
+  const normalizedText =
+    userText
+      .trim()
+      .replace(
+        /[.!?]+$/g,
+        ""
+      );
+
+  const forgetMatch =
+    normalizedText.match(
+      /^forget(?: that)? (?:my )?(.+)$/i
+    );
+
+  console.log(
+    "FORGET CHECK:",
+    normalizedText
+  );
+
+  if (!forgetMatch) {
+    return false;
+  }
+
+  const key =
+    forgetMatch[1]
+      .trim()
+      .toLowerCase()
+      .replace(
+        /\s+/g,
+        "_"
+      );
+
+  console.log(
+    "FORGET KEY:",
+    key
+  );
+
+  try {
+    const response =
+      await fetch(
+        `http://localhost:3000/memory/${encodeURIComponent(
+          key
+        )}`,
+        {
+          method: "DELETE"
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    console.log(
+      "FORGET HTTP STATUS:",
+      response.status
+    );
+
+    console.log(
+      "FORGET RAW RESPONSE:",
+      responseText
+    );
+
+    let result = null;
+
+    if (
+      responseText &&
+      responseText.trim().length > 0
+    ) {
+      try {
+        result =
+          JSON.parse(
+            responseText
+          );
+      } catch (parseError) {
+        console.error(
+          "FORGET RESPONSE IS NOT JSON:",
+          parseError
+        );
+      }
+    }
+
+    if (
+      response.ok &&
+      result?.success === true
+    ) {
+      console.log(
+        "JOJO memory forgotten:",
+        key
+      );
+
+      return true;
+    }
+
+    console.error(
+      "JOJO memory forget failed:",
+      result || responseText
+    );
+
+  } catch (error) {
+    console.error(
+      "Memory forget failed:",
+      error
+    );
+  }
+
+  return false;
+}
+
+/*
+  JOJO LIVE SESSION
+*/
 
 async function startJojo() {
   try {
@@ -478,7 +762,8 @@ async function startJojo() {
 
     session =
       await ai.live.connect({
-        model: MODEL,
+        model:
+          MODEL,
 
         config: {
           responseModalities: [
@@ -582,7 +867,7 @@ async function startJojo() {
                 message.serverContent;
 
               /*
-                DIRECT GEMINI TOOL CALL
+                DIRECT TOOL CALL
               */
 
               if (
@@ -620,7 +905,8 @@ async function startJojo() {
                 const userText =
                   content
                     .inputTranscription
-                    .text;
+                    .text
+                    .trim();
 
                 console.log(
                   "USER SAID:",
@@ -628,103 +914,24 @@ async function startJojo() {
                 );
 
                 /*
-                  MEMORY SYSTEM
+                  FORGET MEMORY
                 */
 
-                const rememberMatch =
-                  userText.match(
-                    /remember(?: that)? my (.+?) is (.+)/i
-                  );
+                await forgetUserMemory(
+                  userText
+                );
 
-                if (
-                  rememberMatch
-                ) {
-                  const key =
-                    rememberMatch[1]
-                      .trim()
-                      .toLowerCase()
-                      .replace(
-                        /\s+/g,
-                        "_"
-                      );
+                /*
+                  SAVE MEMORY
+                */
 
-                  const value =
-                    rememberMatch[2]
-                      .trim();
-
-                  try {
-                    const response =
-                      await fetch(
-                        "http://localhost:3000/memory",
-                        {
-                          method:
-                            "POST",
-
-                          headers: {
-                            "Content-Type":
-                              "application/json"
-                          },
-
-                          body:
-                            JSON.stringify({
-                              key:
-                                key,
-
-                              value:
-                                value
-                            })
-                        }
-                      );
-
-                        const responseText =
-      await response.text();
-
-    console.log(
-      "ACTION HTTP STATUS:",
-      response.status
-    );
-
-    console.log(
-      "ACTION RAW RESPONSE:",
-      responseText
-    );
-
-    let result;
-
-    try {
-      result =
-        JSON.parse(responseText);
-    } catch (parseError) {
-      console.error(
-        "ACTION RESPONSE IS NOT JSON:",
-        parseError
-      );
-
-      result = {
-        success:
-          response.ok
-      };
-    }
-
-                    console.log(
-                      "Memory save result:",
-                      result
-                    );
-
-                  } catch (
-                    error
-                  ) {
-                    console.error(
-                      "Memory save failed:",
-                      error
-                    );
-                  }
-                }
+                await saveUserMemory(
+                  userText
+                );
               }
 
               /*
-                GEMINI FUNCTION CALLS
-                Compatibility with modelTurn.parts
+                MODEL TURN PARTS
               */
 
               if (
@@ -736,6 +943,10 @@ async function startJojo() {
                   const part of
                     content.modelTurn.parts
                 ) {
+                  /*
+                    FUNCTION CALL
+                  */
+
                   if (
                     part.functionCall
                   ) {
