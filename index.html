@@ -1,31 +1,126 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jojo V3</title>
+
+  <title>JOJO V4</title>
 
   <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body>
 
-  <main class="jojo">
+  <div class="app-shell">
 
-    <div class="orb" id="orb">
-      <div class="orb-core"></div>
-    </div>
+    <!-- TOP BAR -->
+    <header class="top-bar">
+      <div class="brand">
+        <div class="brand-dot"></div>
 
-    <h1>JOJO</h1>
+        <div>
+          <div class="brand-name">JOJO</div>
+          <div class="brand-subtitle">
+            Arooj's AI Assistant
+          </div>
+        </div>
+      </div>
 
-    <p id="state">Disconnected</p>
+      <div class="version">
+        V4
+      </div>
+    </header>
 
-    <button id="startButton">
-      START
-    </button>
 
-  </main>
+    <!-- MAIN ASSISTANT AREA -->
+    <main class="jojo">
 
+      <div class="status-label">
+        <span class="status-dot"></span>
+        <span id="state">Disconnected</span>
+      </div>
+
+
+      <!-- JOJO ORB -->
+      <div class="orb-container">
+
+        <div class="orb-ring ring-one"></div>
+        <div class="orb-ring ring-two"></div>
+        <div class="orb-ring ring-three"></div>
+
+        <div class="orb" id="orb">
+          <div class="orb-core"></div>
+        </div>
+
+      </div>
+
+
+      <h1>JOJO</h1>
+
+      <p class="assistant-description">
+        Your personal AI assistant
+      </p>
+
+
+      <!-- START BUTTON -->
+      <button id="startButton" class="start-button">
+        <span class="button-icon">◉</span>
+        <span>START JOJO</span>
+      </button>
+
+
+      <!-- CAPABILITIES -->
+      <section class="capabilities">
+
+        <div class="capability">
+          <span class="capability-icon">◉</span>
+          <div>
+            <strong>Voice</strong>
+            <span>Live conversation</span>
+          </div>
+        </div>
+
+        <div class="capability">
+          <span class="capability-icon">◆</span>
+          <div>
+            <strong>Memory</strong>
+            <span>Persistent memory</span>
+          </div>
+        </div>
+
+        <div class="capability">
+          <span class="capability-icon">↗</span>
+          <div>
+            <strong>Actions</strong>
+            <span>Website control</span>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+
+    <!-- BOTTOM BAR -->
+    <footer class="bottom-bar">
+
+      <span>JOJO SYSTEM</span>
+
+      <span class="separator">•</span>
+
+      <span>VOICE ACTIVE</span>
+
+      <span class="separator">•</span>
+
+      <span>V4 CORE</span>
+
+    </footer>
+
+  </div>
+
+
+  <!-- GEMINI SDK -->
   <script type="module">
     import { GoogleGenAI } from
       "https://esm.run/@google/genai";
@@ -33,7 +128,9 @@
     window.GoogleGenAI = GoogleGenAI;
   </script>
 
+  <!-- JOJO APPLICATION -->
   <script type="module" src="./app.js"></script>
 
 </body>
 </html>
+```

@@ -96,10 +96,61 @@ const stateText =
 
 const startButton =
   document.getElementById("startButton");
-
 function setState(text) {
   if (stateText) {
     stateText.textContent = text;
+  }
+
+  const orb = document.getElementById("orb");
+  const statusDot =
+    document.querySelector(".status-dot");
+
+  if (!orb || !statusDot) {
+    return;
+  }
+
+  const state =
+    String(text).toLowerCase();
+
+  orb.classList.remove(
+    "state-connecting",
+    "state-connected",
+    "state-listening",
+    "state-error"
+  );
+
+  statusDot.classList.remove(
+    "state-connecting",
+    "state-connected",
+    "state-listening",
+    "state-error"
+  );
+
+  if (state.includes("connecting")) {
+    orb.classList.add("state-connecting");
+    statusDot.classList.add("state-connecting");
+  }
+
+  else if (
+    state.includes("connected")
+  ) {
+    orb.classList.add("state-connected");
+    statusDot.classList.add("state-connected");
+  }
+
+  else if (
+    state.includes("listening")
+  ) {
+    orb.classList.add("state-listening");
+    statusDot.classList.add("state-listening");
+  }
+
+  else if (
+    state.includes("error") ||
+    state.includes("failed")
+  ) {
+    orb.classList.add("state-error");
+    statusDot.classList.add("state-error");
   }
 }
 
