@@ -96,12 +96,101 @@ const stateText =
 
 const startButton =
   document.getElementById("startButton");
+
+const memoryList =
+  document.getElementById("memoryList");
+
+const memoryCount =
+  document.getElementById("memoryCount");
+
+/*
+  MEMORY DASHBOARD
+*/
+
+async function loadMemoryDashboard() {
+  if (!memoryList || !memoryCount) {
+    return;
+  }
+
+  try {
+    const response =
+      await fetch(
+        "http://localhost:3000/memory"
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "Could not load memory."
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const memory =
+      data.memory || {};
+
+    const entries =
+      Object.entries(memory);
+
+    memoryCount.textContent =
+      entries.length;
+
+    if (entries.length === 0) {
+      memoryList.innerHTML = `
+        <div class="memory-empty">
+          No memories saved
+        </div>
+      `;
+
+      return;
+    }
+
+    memoryList.innerHTML =
+      entries
+        .map(
+          ([key, value]) => `
+            <div class="memory-item">
+              <span class="memory-key">
+                ${key.replace(/_/g, " ")}
+              </span>
+
+              <span class="memory-value">
+                ${value}
+              </span>
+            </div>
+          `
+        )
+        .join("");
+
+  } catch (error) {
+    console.error(
+      "Memory dashboard failed:",
+      error
+    );
+
+    memoryCount.textContent = "0";
+
+    memoryList.innerHTML = `
+      <div class="memory-empty">
+        Memory unavailable
+      </div>
+    `;
+  }
+}
+
+/*
+  STATE
+*/
+
 function setState(text) {
   if (stateText) {
     stateText.textContent = text;
   }
 
-  const orb = document.getElementById("orb");
+  const orb =
+    document.getElementById("orb");
+
   const statusDot =
     document.querySelector(".status-dot");
 
@@ -131,18 +220,14 @@ function setState(text) {
     statusDot.classList.add("state-connecting");
   }
 
-  else if (
-    state.includes("connected")
-  ) {
-    orb.classList.add("state-connected");
-    statusDot.classList.add("state-connected");
-  }
-
-  else if (
-    state.includes("listening")
-  ) {
+  else if (state.includes("listening")) {
     orb.classList.add("state-listening");
     statusDot.classList.add("state-listening");
+  }
+
+  else if (state.includes("connected")) {
+    orb.classList.add("state-connected");
+    statusDot.classList.add("state-connected");
   }
 
   else if (
@@ -153,6 +238,10 @@ function setState(text) {
     statusDot.classList.add("state-error");
   }
 }
+
+/*
+  TOKEN
+*/
 
 async function getToken() {
   const response =
@@ -177,6 +266,10 @@ async function getToken() {
 
   return data.token;
 }
+
+/*
+  AUDIO HELPERS
+*/
 
 function floatTo16BitPCM(
   float32Array
@@ -322,6 +415,10 @@ function playPCMChunk(
     );
   }
 }
+
+/*
+  MICROPHONE
+*/
 
 async function startMicrophone() {
   stream =
@@ -582,10 +679,7 @@ async function saveUserMemory(
     rememberMatch[1]
       .trim()
       .toLowerCase()
-      .replace(
-        /\s+/g,
-        "_"
-      );
+      .replace(/\s+/g, "_");
 
   const value =
     rememberMatch[2]
@@ -657,6 +751,8 @@ async function saveUserMemory(
         value
       );
 
+      await loadMemoryDashboard();
+
       return true;
     }
 
@@ -685,33 +781,57 @@ async function forgetUserMemory(
   const normalizedText =
     userText
       .trim()
-      .replace(
-        /[.!?]+$/g,
-        ""
-      );
-
-  const forgetMatch =
-    normalizedText.match(
-      /^forget(?: that)? (?:my )?(.+)$/i
-    );
+      .replace(/[.!?]+$/g, "");
 
   console.log(
     "FORGET CHECK:",
     normalizedText
   );
 
-  if (!forgetMatch) {
+  let keyText = "";
+
+  /*
+    Case 1:
+    Forget my favorite color
+  */
+
+  let match =
+    normalizedText.match(
+      /^forget(?: that)? (?:my )?(.+)$/i
+    );
+
+  if (!match) {
     return false;
   }
 
+  keyText =
+    match[1]
+      .trim();
+
+  /*
+    If user says:
+    Forget my favorite color is black
+
+    remove "is black"
+    so key becomes:
+    favorite_color
+  */
+
+  const isMatch =
+    keyText.match(
+      /^(.+?)\s+is\s+.+$/i
+    );
+
+  if (isMatch) {
+    keyText =
+      isMatch[1]
+        .trim();
+  }
+
   const key =
-    forgetMatch[1]
-      .trim()
+    keyText
       .toLowerCase()
-      .replace(
-        /\s+/g,
-        "_"
-      );
+      .replace(/\s+/g, "_");
 
   console.log(
     "FORGET KEY:",
@@ -770,6 +890,8 @@ async function forgetUserMemory(
         key
       );
 
+      await loadMemoryDashboard();
+
       return true;
     }
 
@@ -798,8 +920,16 @@ async function startJojo() {
       "Connecting..."
     );
 
+    console.log(
+      "JOJO: requesting token..."
+    );
+
     const token =
       await getToken();
+
+    console.log(
+      "JOJO: token received."
+    );
 
     const ai =
       new GoogleGenAI({
@@ -1062,6 +1192,8 @@ async function startJojo() {
                 "Gemini Live session closed."
               );
 
+              session = null;
+
               setState(
                 "Disconnected"
               );
@@ -1079,11 +1211,17 @@ async function startJojo() {
       error
     );
 
+    session = null;
+
     setState(
       "Connection failed"
     );
   }
 }
+
+/*
+  START BUTTON
+*/
 
 if (startButton) {
   startButton.addEventListener(
@@ -1091,3 +1229,9 @@ if (startButton) {
     startJojo
   );
 }
+
+/*
+  INITIAL MEMORY LOAD
+*/
+
+loadMemoryDashboard();
